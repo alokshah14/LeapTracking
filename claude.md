@@ -1,8 +1,14 @@
-# LeapTracking - Finger Individuation Game
+# LeapTracking - Finger Individuation Rehabilitation Suite
 
 ## Project Overview
 
-A Unity-based rehabilitation game using Leap Motion hand tracking to help users improve finger independence and dexterity through piano-based exercises.
+A Unity-based rehabilitation game suite using Leap Motion hand tracking to help users improve finger independence and dexterity through multiple game modes. Features personalized per-finger calibration for accurate detection across all games.
+
+## Current Games
+
+1. **Piano Game** - Random finger practice with time pressure
+2. **Practice Piano** - Song-based progression, no time limit
+3. **Missile Defense** - Space Invaders style, shoot down missiles targeting specific fingers ⭐ NEW!
 
 ## Architecture
 
@@ -60,7 +66,47 @@ Dictionary<Chirality, List<PianoKey>> keyboards
 - Score tracking with combo multipliers
 - Four default songs: ScaleUp, FingerExercise, TwinkleTwinkle, SpeedChallenge
 
-#### 4. PianoKey.cs
+#### 4. MissileDefenseManager.cs ⭐ NEW
+**Purpose**: Action-arcade style missile defense game
+
+**Features**:
+- Missiles spawn randomly targeting specific fingers
+- Player must press correct finger to destroy missile before it reaches target
+- Lives system (5 lives, lose 1 per missed missile)
+- Progressive difficulty (speed increases every wave)
+- Score: +10 per destroy, -20 per miss
+- Visual warnings when missiles get close
+
+**Game Flow**:
+```csharp
+1. Spawn missile targeting random finger
+2. Show UI indicator (LEFT THUMB, RIGHT PINKY, etc.)
+3. Missile falls toward finger target position
+4. Player presses finger → Missile destroyed
+5. Missile reaches target → Lose life
+6. Every 100 points → New wave (faster missiles)
+7. 0 lives → Game over
+```
+
+**Key Components**:
+- `Missile.cs`: Individual missile behavior, movement, collision
+- `MissileDefenseManager.cs`: Spawning, scoring, wave management
+- Finger target positions (10 transforms in 3D space)
+
+#### 5. Missile.cs ⭐ NEW
+**Purpose**: Individual missile entity
+
+**Behavior**:
+- Moves from spawn point to target position at configurable speed
+- Changes color when close to target (warning visual)
+- Can be destroyed by correct finger press
+- Triggers events on destroy or reaching target
+
+**Events**:
+- `OnMissileDestroyed(Missile, bool)`: Fired when destroyed (bool = was it correct press)
+- `OnMissileReachedTarget(Missile)`: Fired when missile hits target
+
+#### 6. PianoKey.cs
 **Purpose**: Individual key visualization and state management
 
 **States**:
@@ -68,7 +114,7 @@ Dictionary<Chirality, List<PianoKey>> keyboards
 - `Highlighted`: Yellow/gold - target key to press
 - `Pressed`: Green - key successfully pressed
 
-#### 5. NoteAudioGenerator.cs
+#### 7. NoteAudioGenerator.cs
 **Purpose**: Procedural piano sound generation
 
 **Implementation**:
@@ -88,6 +134,99 @@ Dictionary<Chirality, List<PianoKey>> keyboards
 - **Objective**: Follow note sequences from songs
 - **Difficulty**: No time limit, must press correct finger to advance
 - **Scoring**: Combo-based scoring with accuracy tracking
+
+#### Missile Defense (MissileDefenseManager) ⭐ NEW
+- **Objective**: Destroy missiles before they hit finger targets
+- **Difficulty**: Progressive speed increase, multiple simultaneous missiles
+- **Scoring**: +10 per destroy, -20 per miss, lives system
+
+## Standardized Game Pattern
+
+All games follow this consistent architecture:
+
+### 1. Calibration Integration (Reusable)
+```csharp
+// In Start():
+fingerGame = FindObjectOfType<FingerIndividuationGame>();
+FingerIndividuationGame.OnGestureSuccess += HandleFingerPress;
+
+// Wait for calibration:
+if (!fingerGame.IsCalibrated)
+{
+    fingerGame.StartCalibration();
+    while (!fingerGame.IsCalibrated) yield return null;
+}
+
+// Start game after calibration
+StartGame();
+```
+
+### 2. Finger Press Handling
+```csharp
+private void HandleFingerPress(Chirality hand, int fingerIndex)
+{
+    // Check if pressed finger matches game logic
+    if (IsCorrectFinger(hand, fingerIndex))
+    {
+        // Award points, positive feedback
+    }
+    else
+    {
+        // Penalty or ignore
+    }
+}
+```
+
+### 3. Required Components
+- Subscribe to `FingerIndividuationGame.OnGestureSuccess` event
+- Use `GameUIManager.Instance` for UI updates
+- Use `HandDataLogger.Instance` for event logging
+- Handle pause state via `fingerGame.IsPaused`
+
+### 4. Creating a New Game (Template)
+```csharp
+public class MyGameManager : MonoBehaviour
+{
+    private FingerIndividuationGame fingerGame;
+
+    void Start()
+    {
+        // 1. Find finger game
+        fingerGame = FindObjectOfType<FingerIndividuationGame>();
+        FingerIndividuationGame.OnGestureSuccess += HandleFingerPress;
+
+        // 2. Start calibration
+        StartCoroutine(CalibrationAndGameStart());
+    }
+
+    void OnDestroy()
+    {
+        // 3. Unsubscribe
+        FingerIndividuationGame.OnGestureSuccess -= HandleFingerPress;
+    }
+
+    IEnumerator CalibrationAndGameStart()
+    {
+        // Show instructions
+        GameUIManager.Instance.ShowInstruction("MY GAME");
+
+        // Calibrate if needed
+        if (!fingerGame.IsCalibrated)
+        {
+            fingerGame.StartCalibration();
+            while (!fingerGame.IsCalibrated) yield return null;
+        }
+
+        // Start your game
+        StartGame();
+    }
+
+    private void HandleFingerPress(Chirality hand, int fingerIndex)
+    {
+        // Your game logic here
+    }
+}
+```
 
 ## Calibration System
 
@@ -223,9 +362,11 @@ Key parameters in Inspector:
 ```
 Assets/
 ├── Scripts/
-│   ├── FingerIndividuationGame.cs    # Core detection
+│   ├── FingerIndividuationGame.cs    # Core detection & calibration
 │   ├── PianoGameManager.cs           # Random finger game
 │   ├── RhythmGameManager.cs          # Song practice mode
+│   ├── MissileDefenseManager.cs      # Missile defense game ⭐ NEW
+│   ├── Missile.cs                    # Missile entity ⭐ NEW
 │   ├── PianoKey.cs                   # Key visualization
 │   ├── NoteAudioGenerator.cs         # Sound generation
 │   ├── HandDataLogger.cs             # CSV logging
@@ -236,7 +377,8 @@ Assets/
 └── Scenes/
     ├── MainMenu
     ├── PianoGame
-    └── PracticePiano
+    ├── PracticePiano
+    └── MissileDefense                # ⭐ NEW (to be created)
 ```
 
 ## Testing Checklist
@@ -264,6 +406,16 @@ Assets/
 - [ ] Score updates correctly
 - [ ] Error messages show correct target
 
+### Missile Defense (NEW)
+- [ ] Missiles spawn and move toward targets
+- [ ] UI shows which finger to press
+- [ ] Correct finger press destroys missile
+- [ ] Wrong finger press shows feedback
+- [ ] Missiles reaching target reduces lives
+- [ ] Score updates correctly (+10/-20)
+- [ ] Wave difficulty increases
+- [ ] Game over triggers at 0 lives
+
 ## Performance Considerations
 
 - Angle calculations run every frame (~90 FPS)
@@ -278,3 +430,69 @@ Assets/
 3. **Speed Challenges**: Progressively faster sequences
 4. **Statistics Dashboard**: Track improvement over time
 5. **Custom Songs**: Song editor for creating new practice sequences
+6. **Missile Defense Enhancements**:
+   - Power-ups (slow time, shield, multi-shot)
+   - Boss waves with special patterns
+   - Multiple simultaneous missiles
+   - Combo system for consecutive destroys
+
+---
+
+## Session History
+
+### Session 2 - January 27, 2026 (Missile Defense Game)
+**Accomplishments**:
+- ✅ Created Missile Defense game (Space Invaders style)
+- ✅ Implemented Missile.cs entity with movement and collision
+- ✅ Implemented MissileDefenseManager.cs with spawning and scoring
+- ✅ Documented standardized game pattern for reusability
+- ✅ Updated claude.md with new game architecture
+
+**Game Features**:
+- Missiles spawn randomly targeting specific fingers
+- Lives system (5 lives)
+- Progressive difficulty (wave-based speed increase)
+- Score: +10 per destroy, -20 per miss
+- Visual warnings when missiles get close
+- Auto-restart after game over
+
+**Standardization**:
+- All games now follow consistent calibration pattern
+- Subscribe to `OnGestureSuccess` event
+- Reuse `FingerIndividuationGame` for detection
+- Common UI/logging interfaces
+
+**Files Created**:
+- `Assets/Scripts/Missile.cs` (~110 lines)
+- `Assets/Scripts/MissileDefenseManager.cs` (~400 lines)
+
+**Next Steps**:
+- Create Unity scene for Missile Defense
+- Create missile prefab with visuals
+- Set up finger target position transforms
+- Test gameplay and balance difficulty
+- Add to menu system
+
+### Session 1 - January 27, 2026 (Per-Finger Calibration)
+**Accomplishments**:
+- ✅ Implemented per-finger calibration system
+- ✅ Fixed thumb detection issues
+- ✅ Fixed ring finger detection issues
+- ✅ Added audio feedback to PianoGameManager
+- ✅ Created comprehensive documentation (claude.md, session.md)
+- ✅ Set up GitHub repository
+
+**Problem Solved**:
+- Replaced fixed thresholds with personalized calibration
+- Each of 10 fingers calibrated individually
+- Detection based on distance to baseline vs pressed state
+
+**Files Modified**:
+- `FingerIndividuationGame.cs` (~300 lines changed)
+- `PianoGameManager.cs` (~70 lines changed)
+- `PianoKey.cs` (~30 lines changed)
+
+**Repository**:
+- GitHub: https://github.com/alokshah14/LeapTracking
+- Initial commit: Per-finger calibration system
+- Second commit: Unity project files
