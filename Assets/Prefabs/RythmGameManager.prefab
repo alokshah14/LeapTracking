@@ -1,0 +1,73 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &1574390797129072848
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2655815838764357737}
+  - component: {fileID: 8431029735362184687}
+  m_Layer: 0
+  m_Name: RythmGameManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2655815838764357737
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1574390797129072848}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0.0791, y: 0, z: 1.38029}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &8431029735362184687
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1574390797129072848}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5037e86c0cc1b4448aef14d10be2c5c0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RhythmGameManager
+  songLibrary: []
+  currentSongIndex: 0
+  leftHandKeys:
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  rightHandKeys:
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  normalMaterial: {fileID: 2100000, guid: 342ebfd2c67fa493293f1e229a882ae5, type: 2}
+  highlightMaterial: {fileID: 2100000, guid: 167439183a35f41ffa3943a117bc6deb, type: 2}
+  pressedMaterial: {fileID: 2100000, guid: 078b7fb495b704dc187d1b8eedfca173, type: 2}
+  missedMaterial: {fileID: 2100000, guid: 0ff18db7a2dcd404386dc49bf5d0bf72, type: 2}
+  musicSource: {fileID: 0}
+  sfxSource: {fileID: 0}
+  perfectWindow: 0.15
+  goodWindow: 0.3
+  okWindow: 0.5
+  perfectScore: 100
+  goodScore: 50
+  okScore: 25
+  missScore: -10
