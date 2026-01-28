@@ -4,6 +4,37 @@ Complete step-by-step instructions to create the Missile Defense scene and prefa
 
 ---
 
+## ⚡ QUICK START (2 Minutes!)
+
+### Automatic Setup (Recommended)
+
+1. **Create new scene**:
+   - File → New Scene → 3D
+   - Save as `Assets/Scenes/MissileDefense.unity`
+
+2. **Add Scene Builder**:
+   - GameObject → Create Empty
+   - Name: `SceneBuilder`
+   - Add Component: `MissileDefenseSceneBuilder`
+   - **Click "Build Complete Scene" button** in Inspector
+   - ✨ Done! All components auto-added
+
+3. **Add Targets & Manager**:
+   - Add Component: `MissileDefenseSetup` to same GameObject
+   - **Click "Setup Scene" button**
+   - GameObject → Create Empty → Name: `MissileDefenseManager`
+   - Add Component: `MissileDefenseManager`
+
+4. **Create Missile Prefab** (see Part 3 below)
+
+5. **Assign References** (see Part 4 below)
+
+6. **Press Play!** 🎮
+
+---
+
+## 📖 Manual Setup (If Auto-Setup Doesn't Work)
+
 ## Part 1: Create the Scene
 
 ### Step 1: Create New Scene
@@ -20,7 +51,7 @@ If not, create them:
 - **GameObject → Camera** (name it "Main Camera")
 - **GameObject → Light → Directional Light**
 
-### Step 3: Add Required Components
+### Step 3: Add Required Components (AUTO or MANUAL)
 
 #### A. Create FingerIndividuationGame GameObject
 1. **GameObject → Create Empty**
