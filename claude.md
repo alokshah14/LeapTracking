@@ -367,6 +367,8 @@ Assets/
 │   ├── RhythmGameManager.cs          # Song practice mode
 │   ├── MissileDefenseManager.cs      # Missile defense game ⭐ NEW
 │   ├── Missile.cs                    # Missile entity ⭐ NEW
+│   ├── MissileDefenseSetup.cs        # Auto-generates finger targets ⭐ NEW
+│   ├── MissileDefenseSceneBuilder.cs # Auto-adds Leap/calibration ⭐ NEW
 │   ├── PianoKey.cs                   # Key visualization
 │   ├── NoteAudioGenerator.cs         # Sound generation
 │   ├── HandDataLogger.cs             # CSV logging
@@ -445,6 +447,9 @@ Assets/
 - ✅ Created Missile Defense game (Space Invaders style)
 - ✅ Implemented Missile.cs entity with movement and collision
 - ✅ Implemented MissileDefenseManager.cs with spawning and scoring
+- ✅ Created MissileDefenseSetup.cs - auto-generates finger targets
+- ✅ Created MissileDefenseSceneBuilder.cs - auto-adds Leap/calibration components
+- ✅ Created MISSILE_DEFENSE_SETUP.md - comprehensive Unity setup guide
 - ✅ Documented standardized game pattern for reusability
 - ✅ Updated claude.md with new game architecture
 
@@ -462,14 +467,22 @@ Assets/
 - Reuse `FingerIndividuationGame` for detection
 - Common UI/logging interfaces
 
+**Scene Setup Automation**:
+- MissileDefenseSetup: One-click finger target generation
+- MissileDefenseSceneBuilder: One-click component addition (Leap, calibration, UI)
+- Uses reflection to assign private SerializeField references
+- Custom Unity Editor buttons for easy scene setup
+
 **Files Created**:
 - `Assets/Scripts/Missile.cs` (~110 lines)
 - `Assets/Scripts/MissileDefenseManager.cs` (~400 lines)
+- `Assets/Scripts/MissileDefenseSetup.cs` (~237 lines)
+- `Assets/Scripts/MissileDefenseSceneBuilder.cs` (~260 lines)
+- `MISSILE_DEFENSE_SETUP.md` (~377 lines)
 
 **Next Steps**:
-- Create Unity scene for Missile Defense
-- Create missile prefab with visuals
-- Set up finger target position transforms
+- Create missile prefab with materials (Blue normal, Red warning)
+- Assign all references in MissileDefenseManager Inspector
 - Test gameplay and balance difficulty
 - Add to menu system
 
