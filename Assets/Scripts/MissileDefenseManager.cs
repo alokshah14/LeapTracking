@@ -7,11 +7,12 @@ public class MissileDefenseManager : MonoBehaviour
 {
     [Header("Game Settings")]
     [SerializeField] private int startingLives = 5;
-    [SerializeField] private float initialMissileSpeed = 0.8f;  // Slower for testing
-    [SerializeField] private float speedIncreasePerWave = 0.1f;
-    [SerializeField] private float timeBetweenMissiles = 3.0f;  // More time between missiles
+    [SerializeField] private float initialMissileSpeed = 0.3f;  // Much slower - easy to shoot
+    [SerializeField] private float speedIncreasePerWave = 0.05f;  // Gradual increase
+    [SerializeField] private float timeBetweenMissiles = 4.0f;  // More time to aim
     [SerializeField] private int pointsPerDestroy = 10;
     [SerializeField] private int pointsLostPerMiss = -20;
+    [SerializeField] private float playerProjectileSpeed = 5.0f;  // How fast we shoot up
 
     [Header("Missile Spawning")]
     [SerializeField] private GameObject missilePrefab;
@@ -27,10 +28,15 @@ public class MissileDefenseManager : MonoBehaviour
     [SerializeField] private Material missileMaterial;
     [SerializeField] private Material warningMaterial;
 
+    [Header("Shooting")]
+    [SerializeField] private GameObject projectilePrefab;
+    [SerializeField] private Transform projectileSpawnParent;
+
     [Header("Audio")]
     [SerializeField] private AudioClip missileSpawnSound;
     [SerializeField] private AudioClip destroySound;
     [SerializeField] private AudioClip missSound;
+    [SerializeField] private AudioClip shootSound;
 
     // Game state
     private int currentScore = 0;
@@ -47,11 +53,17 @@ public class MissileDefenseManager : MonoBehaviour
     // Target positions dictionary
     private Dictionary<Chirality, Transform[]> fingerTargets = new Dictionary<Chirality, Transform[]>();
 
-    // Visual highlighting
+    // Visual highlighting (Leap Motion fingers)
+    private LeapFingerHighlighter fingerHighlighter;
+
+    // Old sphere highlighting (keeping for backup)
     private Transform currentHighlightedTarget;
     private Vector3 originalScale;
     private Material originalMaterial;
     private Material highlightMaterial;
+
+    // Active projectiles
+    private System.Collections.Generic.List<PlayerProjectile> activeProjectiles = new System.Collections.Generic.List<PlayerProjectile>();
 
     void Start()
     {
@@ -61,6 +73,14 @@ public class MissileDefenseManager : MonoBehaviour
 
         // Create highlight material
         CreateHighlightMaterial();
+
+        // Create or find Leap Finger Highlighter
+        fingerHighlighter = FindObjectOfType<LeapFingerHighlighter>();
+        if (fingerHighlighter == null)
+        {
+            GameObject highlighterGO = new GameObject("LeapFingerHighlighter");
+            fingerHighlighter = highlighterGO.AddComponent<LeapFingerHighlighter>();
+        }
 
         // Find and subscribe to finger game
         fingerGame = FindObjectOfType<FingerIndividuationGame>();
@@ -76,6 +96,9 @@ public class MissileDefenseManager : MonoBehaviour
         // Subscribe to missile events
         Missile.OnMissileDestroyed += HandleMissileDestroyed;
         Missile.OnMissileReachedTarget += HandleMissileReachedTarget;
+
+        // Subscribe to projectile events
+        PlayerProjectile.OnProjectileHit += HandleProjectileHit;
 
         // Ensure UI exists
         if (GameUIManager.Instance == null)
@@ -105,6 +128,7 @@ public class MissileDefenseManager : MonoBehaviour
         }
         Missile.OnMissileDestroyed -= HandleMissileDestroyed;
         Missile.OnMissileReachedTarget -= HandleMissileReachedTarget;
+        PlayerProjectile.OnProjectileHit -= HandleProjectileHit;
     }
 
     IEnumerator CalibrationAndGameStart()
@@ -300,8 +324,8 @@ public class MissileDefenseManager : MonoBehaviour
                 GameUIManager.Instance.ShowTargetFinger(handName, fingerNames[fingerIndex].ToUpper());
             }
 
-            // Highlight the target finger position in 3D space
-            HighlightFingerTarget(targetTransform);
+            // Highlight the actual Leap Motion finger AND the target sphere
+            HighlightFingerTarget(hand, fingerIndex, targetTransform);
 
             Debug.Log($"Spawned missile targeting {hand} {fingerNames[fingerIndex]}");
         }
@@ -313,35 +337,50 @@ public class MissileDefenseManager : MonoBehaviour
         }
     }
 
-    void HighlightFingerTarget(Transform target)
+    void HighlightFingerTarget(Chirality hand, int fingerIndex, Transform target)
     {
         // Unhighlight previous target
         UnhighlightFingerTarget();
 
-        // Find the visual marker (child sphere)
-        Transform marker = target.Find("VisualMarker");
-        if (marker == null) return;
-
-        currentHighlightedTarget = marker;
-
-        // Store original properties
-        Renderer renderer = marker.GetComponent<Renderer>();
-        if (renderer != null)
+        // IMPORTANT: Highlight the actual Leap Motion finger!
+        if (fingerHighlighter != null)
         {
-            originalMaterial = renderer.material;
-            originalScale = marker.localScale;
+            fingerHighlighter.HighlightFinger(hand, fingerIndex);
+            Debug.Log($"Highlighting Leap Motion finger: {hand} {fingerNames[fingerIndex]}");
+        }
 
-            // Apply highlight
-            renderer.material = highlightMaterial;
-            marker.localScale = originalScale * 2.5f; // Make it bigger
+        // Also highlight the target sphere (backup visual)
+        Transform marker = target.Find("VisualMarker");
+        if (marker != null)
+        {
+            currentHighlightedTarget = marker;
 
-            // Start pulsing animation
-            StartCoroutine(PulseTarget(marker));
+            // Store original properties
+            Renderer renderer = marker.GetComponent<Renderer>();
+            if (renderer != null)
+            {
+                originalMaterial = renderer.material;
+                originalScale = marker.localScale;
+
+                // Apply highlight
+                renderer.material = highlightMaterial;
+                marker.localScale = originalScale * 2.5f; // Make it bigger
+
+                // Start pulsing animation
+                StartCoroutine(PulseTarget(marker));
+            }
         }
     }
 
     void UnhighlightFingerTarget()
     {
+        // Unhighlight Leap Motion finger
+        if (fingerHighlighter != null)
+        {
+            fingerHighlighter.UnhighlightFinger();
+        }
+
+        // Unhighlight sphere
         if (currentHighlightedTarget != null)
         {
             Renderer renderer = currentHighlightedTarget.GetComponent<Renderer>();
@@ -385,8 +424,8 @@ public class MissileDefenseManager : MonoBehaviour
 
         if (targetMissile != null)
         {
-            // Correct press - destroy missile
-            targetMissile.Destroy(true);
+            // Correct press - SHOOT A PROJECTILE at the missile!
+            ShootProjectile(hand, fingerIndex, targetMissile);
         }
         else
         {
@@ -396,6 +435,72 @@ public class MissileDefenseManager : MonoBehaviour
                 GameUIManager.Instance.ShowError("No missile targeting that finger!");
             }
         }
+    }
+
+    void ShootProjectile(Chirality hand, int fingerIndex, Missile targetMissile)
+    {
+        if (projectilePrefab == null)
+        {
+            Debug.LogError("Projectile prefab not assigned! Falling back to instant destroy.");
+            targetMissile.Destroy(true);
+            return;
+        }
+
+        // Get the current finger tip position from Leap Motion
+        Vector3 fingerTipPos = Vector3.zero;
+        if (fingerHighlighter != null)
+        {
+            fingerTipPos = fingerHighlighter.GetFingerTipPosition(hand, fingerIndex);
+        }
+
+        // Fallback to target sphere position if we can't get finger tip
+        if (fingerTipPos == Vector3.zero)
+        {
+            Transform targetTransform = fingerTargets[hand][fingerIndex];
+            if (targetTransform != null)
+            {
+                fingerTipPos = targetTransform.position;
+            }
+        }
+
+        // Create projectile
+        GameObject projectileObj = Instantiate(projectilePrefab, fingerTipPos, Quaternion.identity);
+        if (projectileSpawnParent != null)
+        {
+            projectileObj.transform.SetParent(projectileSpawnParent);
+        }
+
+        PlayerProjectile projectile = projectileObj.GetComponent<PlayerProjectile>();
+        if (projectile != null)
+        {
+            projectile.Initialize(hand, fingerIndex, fingerTipPos, targetMissile.transform.position, targetMissile, playerProjectileSpeed);
+            activeProjectiles.Add(projectile);
+
+            Debug.Log($"Shot projectile from {hand} {fingerNames[fingerIndex]} toward missile!");
+        }
+
+        // Play shoot sound
+        if (shootSound != null)
+        {
+            AudioSource.PlayClipAtPoint(shootSound, fingerTipPos, 0.7f);
+        }
+    }
+
+    private void HandleProjectileHit(PlayerProjectile projectile, Missile missile)
+    {
+        // Remove projectile from active list
+        if (activeProjectiles.Contains(projectile))
+        {
+            activeProjectiles.Remove(projectile);
+        }
+
+        // Destroy the missile
+        if (missile != null && activeMissiles.Contains(missile))
+        {
+            missile.Destroy(true);
+        }
+
+        Debug.Log("Projectile hit missile!");
     }
 
     private void HandleMissileDestroyed(Missile missile, bool wasCorrectPress)
