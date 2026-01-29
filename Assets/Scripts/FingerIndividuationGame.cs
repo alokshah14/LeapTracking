@@ -615,6 +615,9 @@ public class FingerIndividuationGame : MonoBehaviour
         Debug.Log($"Pressed Right: {FormatAngles(pressedAngles[Chirality.Right])}");
         Debug.Log($"Max drift allowed: {maxPositionDrift}m");
 
+        // Automatically save calibration data
+        SaveCalibration();
+
         OnCalibrationProgress?.Invoke(1f);
         OnCalibrationStatus?.Invoke("Calibration complete!\n\nGame starting...");
     }
@@ -786,5 +789,141 @@ public class FingerIndividuationGame : MonoBehaviour
             // Return the position of the tip of the target finger
             return fingers[TargetFingerIndex].TipPosition;
         }
+
+        // ===== CALIBRATION SAVE/LOAD SYSTEM =====
+
+        /// <summary>
+        /// Check if saved calibration data exists
+        /// </summary>
+        public bool HasSavedCalibration()
+        {
+            return PlayerPrefs.HasKey("CalibrationSaved");
+        }
+
+        /// <summary>
+        /// Save current calibration data to PlayerPrefs
+        /// </summary>
+        public void SaveCalibration()
+        {
+            if (!isCalibrated)
+            {
+                Debug.LogWarning("Cannot save - not calibrated yet!");
+                return;
+            }
+
+            // Save each hand's data
+            foreach (Chirality hand in new[] { Chirality.Left, Chirality.Right })
+            {
+                if (baselineAngles.ContainsKey(hand) && pressedAngles.ContainsKey(hand))
+                {
+                    // Save baseline angles
+                    for (int i = 0; i < 5; i++)
+                    {
+                        PlayerPrefs.SetFloat($"Baseline_{hand}_{i}", baselineAngles[hand][i]);
+                        PlayerPrefs.SetFloat($"Pressed_{hand}_{i}", pressedAngles[hand][i]);
+                    }
+
+                    // Save baseline position
+                    if (baselinePositions.ContainsKey(hand))
+                    {
+                        Vector3 pos = baselinePositions[hand];
+                        PlayerPrefs.SetFloat($"BaselinePos_{hand}_X", pos.x);
+                        PlayerPrefs.SetFloat($"BaselinePos_{hand}_Y", pos.y);
+                        PlayerPrefs.SetFloat($"BaselinePos_{hand}_Z", pos.z);
+                    }
+                }
+            }
+
+            PlayerPrefs.SetInt("CalibrationSaved", 1);
+            PlayerPrefs.Save();
+
+            Debug.Log("✓ Calibration data saved!");
+            if (GameUIManager.Instance != null)
+            {
+                GameUIManager.Instance.ShowSuccess("Calibration saved!");
+            }
+        }
+
+        /// <summary>
+        /// Load calibration data from PlayerPrefs
+        /// </summary>
+        public bool LoadCalibration()
+        {
+            if (!HasSavedCalibration())
+            {
+                Debug.LogWarning("No saved calibration data found!");
+                return false;
+            }
+
+            // Load each hand's data
+            foreach (Chirality hand in new[] { Chirality.Left, Chirality.Right })
+            {
+                float[] baseline = new float[5];
+                float[] pressed = new float[5];
+
+                for (int i = 0; i < 5; i++)
+                {
+                    baseline[i] = PlayerPrefs.GetFloat($"Baseline_{hand}_{i}", 0f);
+                    pressed[i] = PlayerPrefs.GetFloat($"Pressed_{hand}_{i}", 0f);
+                }
+
+                baselineAngles[hand] = baseline;
+                pressedAngles[hand] = pressed;
+
+                // Load baseline position
+                Vector3 pos = new Vector3(
+                    PlayerPrefs.GetFloat($"BaselinePos_{hand}_X", 0f),
+                    PlayerPrefs.GetFloat($"BaselinePos_{hand}_Y", 0f),
+                    PlayerPrefs.GetFloat($"BaselinePos_{hand}_Z", 0f)
+                );
+                baselinePositions[hand] = pos;
+            }
+
+            isCalibrated = true;
+            gameState = GameState.Playing;
+
+            Debug.Log("✓ Calibration data loaded!");
+            if (GameUIManager.Instance != null)
+            {
+                GameUIManager.Instance.ShowSuccess("Calibration loaded!");
+                GameUIManager.Instance.HideProgress();
+                GameUIManager.Instance.HideCountdown();
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Delete saved calibration data
+        /// </summary>
+        public void ClearSavedCalibration()
+        {
+            PlayerPrefs.DeleteKey("CalibrationSaved");
+
+            foreach (Chirality hand in new[] { Chirality.Left, Chirality.Right })
+            {
+                for (int i = 0; i < 5; i++)
+                {
+                    PlayerPrefs.DeleteKey($"Baseline_{hand}_{i}");
+                    PlayerPrefs.DeleteKey($"Pressed_{hand}_{i}");
+                }
+                PlayerPrefs.DeleteKey($"BaselinePos_{hand}_X");
+                PlayerPrefs.DeleteKey($"BaselinePos_{hand}_Y");
+                PlayerPrefs.DeleteKey($"BaselinePos_{hand}_Z");
+            }
+
+            PlayerPrefs.Save();
+            Debug.Log("Saved calibration cleared");
+        }
+
+        /// <summary>
+        /// Prompt user to choose between loading saved calibration or recalibrating
+        /// Returns true if user wants to load saved data
+        /// </summary>
+        public bool PromptCalibrationChoice()
+        {
+            // This will be called by game managers
+            // They can use this to decide whether to call LoadCalibration() or StartCalibration()
+            return HasSavedCalibration();
+        }
     }
-    

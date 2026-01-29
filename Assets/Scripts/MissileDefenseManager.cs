@@ -7,9 +7,9 @@ public class MissileDefenseManager : MonoBehaviour
 {
     [Header("Game Settings")]
     [SerializeField] private int startingLives = 5;
-    [SerializeField] private float initialMissileSpeed = 1.5f;
-    [SerializeField] private float speedIncreasePerWave = 0.2f;
-    [SerializeField] private float timeBetweenMissiles = 2.0f;
+    [SerializeField] private float initialMissileSpeed = 0.8f;  // Slower for testing
+    [SerializeField] private float speedIncreasePerWave = 0.1f;
+    [SerializeField] private float timeBetweenMissiles = 3.0f;  // More time between missiles
     [SerializeField] private int pointsPerDestroy = 10;
     [SerializeField] private int pointsLostPerMiss = -20;
 
@@ -47,11 +47,20 @@ public class MissileDefenseManager : MonoBehaviour
     // Target positions dictionary
     private Dictionary<Chirality, Transform[]> fingerTargets = new Dictionary<Chirality, Transform[]>();
 
+    // Visual highlighting
+    private Transform currentHighlightedTarget;
+    private Vector3 originalScale;
+    private Material originalMaterial;
+    private Material highlightMaterial;
+
     void Start()
     {
         // Setup finger target positions
         fingerTargets[Chirality.Left] = leftFingerTargets;
         fingerTargets[Chirality.Right] = rightFingerTargets;
+
+        // Create highlight material
+        CreateHighlightMaterial();
 
         // Find and subscribe to finger game
         fingerGame = FindObjectOfType<FingerIndividuationGame>();
@@ -79,6 +88,15 @@ public class MissileDefenseManager : MonoBehaviour
         StartCoroutine(CalibrationAndGameStart());
     }
 
+    void CreateHighlightMaterial()
+    {
+        // Create bright yellow glowing material for highlighting
+        highlightMaterial = new Material(Shader.Find("Standard"));
+        highlightMaterial.color = Color.yellow;
+        highlightMaterial.SetColor("_EmissionColor", Color.yellow * 2f);
+        highlightMaterial.EnableKeyword("_EMISSION");
+    }
+
     void OnDestroy()
     {
         if (fingerGame != null)
@@ -102,23 +120,67 @@ public class MissileDefenseManager : MonoBehaviour
 
         yield return new WaitForSeconds(2.0f);
 
-        // Start calibration if needed
+        // Check if we have saved calibration
         if (fingerGame != null && !fingerGame.IsCalibrated)
         {
-            fingerGame.StartCalibration();
-
-            while (!fingerGame.IsCalibrated)
+            if (fingerGame.HasSavedCalibration())
             {
-                yield return null;
-            }
+                // Try to load saved calibration
+                if (GameUIManager.Instance != null)
+                {
+                    GameUIManager.Instance.ShowCalibrationStatus("Found saved calibration!\nLoading...");
+                }
 
-            if (GameUIManager.Instance != null)
+                yield return new WaitForSeconds(1f);
+
+                bool loaded = fingerGame.LoadCalibration();
+
+                if (loaded)
+                {
+                    if (GameUIManager.Instance != null)
+                    {
+                        GameUIManager.Instance.ShowSuccess("Calibration loaded!\nPress SPACE to recalibrate");
+                    }
+
+                    yield return new WaitForSeconds(2f);
+                }
+                else
+                {
+                    // Failed to load, start calibration
+                    fingerGame.StartCalibration();
+
+                    while (!fingerGame.IsCalibrated)
+                    {
+                        yield return null;
+                    }
+
+                    if (GameUIManager.Instance != null)
+                    {
+                        GameUIManager.Instance.HideCountdown();
+                        GameUIManager.Instance.HideProgress();
+                    }
+
+                    yield return new WaitForSeconds(1f);
+                }
+            }
+            else
             {
-                GameUIManager.Instance.HideCountdown();
-                GameUIManager.Instance.HideProgress();
-            }
+                // No saved calibration, start fresh
+                fingerGame.StartCalibration();
 
-            yield return new WaitForSeconds(1f);
+                while (!fingerGame.IsCalibrated)
+                {
+                    yield return null;
+                }
+
+                if (GameUIManager.Instance != null)
+                {
+                    GameUIManager.Instance.HideCountdown();
+                    GameUIManager.Instance.HideProgress();
+                }
+
+                yield return new WaitForSeconds(1f);
+            }
         }
 
         // Start game
@@ -238,6 +300,9 @@ public class MissileDefenseManager : MonoBehaviour
                 GameUIManager.Instance.ShowTargetFinger(handName, fingerNames[fingerIndex].ToUpper());
             }
 
+            // Highlight the target finger position in 3D space
+            HighlightFingerTarget(targetTransform);
+
             Debug.Log($"Spawned missile targeting {hand} {fingerNames[fingerIndex]}");
         }
 
@@ -245,6 +310,59 @@ public class MissileDefenseManager : MonoBehaviour
         if (missileSpawnSound != null)
         {
             AudioSource.PlayClipAtPoint(missileSpawnSound, spawnPos, 0.5f);
+        }
+    }
+
+    void HighlightFingerTarget(Transform target)
+    {
+        // Unhighlight previous target
+        UnhighlightFingerTarget();
+
+        // Find the visual marker (child sphere)
+        Transform marker = target.Find("VisualMarker");
+        if (marker == null) return;
+
+        currentHighlightedTarget = marker;
+
+        // Store original properties
+        Renderer renderer = marker.GetComponent<Renderer>();
+        if (renderer != null)
+        {
+            originalMaterial = renderer.material;
+            originalScale = marker.localScale;
+
+            // Apply highlight
+            renderer.material = highlightMaterial;
+            marker.localScale = originalScale * 2.5f; // Make it bigger
+
+            // Start pulsing animation
+            StartCoroutine(PulseTarget(marker));
+        }
+    }
+
+    void UnhighlightFingerTarget()
+    {
+        if (currentHighlightedTarget != null)
+        {
+            Renderer renderer = currentHighlightedTarget.GetComponent<Renderer>();
+            if (renderer != null && originalMaterial != null)
+            {
+                renderer.material = originalMaterial;
+                currentHighlightedTarget.localScale = originalScale;
+            }
+            currentHighlightedTarget = null;
+        }
+    }
+
+    IEnumerator PulseTarget(Transform target)
+    {
+        Vector3 baseScale = target.localScale;
+        while (target == currentHighlightedTarget && currentHighlightedTarget != null)
+        {
+            // Pulse between 1x and 1.2x
+            float pulse = 1f + Mathf.Sin(Time.time * 5f) * 0.2f;
+            target.localScale = baseScale * pulse;
+            yield return null;
         }
     }
 
@@ -284,6 +402,9 @@ public class MissileDefenseManager : MonoBehaviour
     {
         activeMissiles.Remove(missile);
 
+        // Unhighlight the finger target
+        UnhighlightFingerTarget();
+
         if (wasCorrectPress)
         {
             // Add points
@@ -309,6 +430,9 @@ public class MissileDefenseManager : MonoBehaviour
     private void HandleMissileReachedTarget(Missile missile)
     {
         activeMissiles.Remove(missile);
+
+        // Unhighlight the finger target
+        UnhighlightFingerTarget();
 
         // Lose a life
         currentLives--;
