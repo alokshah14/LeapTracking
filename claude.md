@@ -230,6 +230,51 @@ public class MyGameManager : MonoBehaviour
 
 ## Calibration System
 
+### Calibration Save/Load System (NEW!)
+
+**Problem**: Recalibrating 10 fingers every time during testing is tedious (~20 seconds).
+
+**Solution**: Automatic save/load system using Unity PlayerPrefs.
+
+**How It Works**:
+1. **First Time**: User calibrates all 10 fingers as normal
+2. **Auto-Save**: After successful calibration, data is automatically saved to PlayerPrefs
+3. **Next Time**: On game start, system detects saved calibration and loads it automatically
+4. **Skip Calibration**: Game starts immediately with loaded calibration (saves 20+ seconds!)
+5. **Recalibrate Option**: User can press SPACE to force recalibration if hand position changed
+
+**Saved Data**:
+- Baseline angles for all 10 fingers (Left 0-4, Right 0-4)
+- Pressed angles for all 10 fingers
+- Baseline hand positions (for drift detection)
+- Persists across Unity sessions
+
+**API Methods** (FingerIndividuationGame.cs):
+```csharp
+bool HasSavedCalibration()      // Check if saved data exists
+bool LoadCalibration()          // Load saved data, returns true if successful
+void SaveCalibration()          // Save current calibration (auto-called after calibration)
+void ClearSavedCalibration()    // Delete saved data (force fresh calibration)
+```
+
+**Usage in Game Managers**:
+```csharp
+if (fingerGame.HasSavedCalibration())
+{
+    bool loaded = fingerGame.LoadCalibration();
+    if (loaded)
+    {
+        // Calibration loaded, start game immediately
+        StartGame();
+    }
+}
+else
+{
+    // No saved data, start calibration
+    fingerGame.StartCalibration();
+}
+```
+
 ### Why Per-Finger Calibration?
 
 The original fixed-threshold approach failed because:
@@ -442,7 +487,7 @@ Assets/
 
 ## Session History
 
-### Session 2 - January 27, 2026 (Missile Defense Game)
+### Session 2 - January 27-29, 2026 (Missile Defense Game)
 **Accomplishments**:
 - ✅ Created Missile Defense game (Space Invaders style)
 - ✅ Implemented Missile.cs entity with movement and collision
@@ -452,14 +497,21 @@ Assets/
 - ✅ Created MISSILE_DEFENSE_SETUP.md - comprehensive Unity setup guide
 - ✅ Documented standardized game pattern for reusability
 - ✅ Updated claude.md with new game architecture
+- ✅ Added visual finger highlighting (2.5x pulsing yellow glow)
+- ✅ Slowed down missiles for easier testing (0.8 speed, 3s intervals)
+- ✅ Implemented calibration save/load system (no recalibration needed!)
 
 **Game Features**:
 - Missiles spawn randomly targeting specific fingers
+- **Visual Finger Highlighting**: Target finger pulses with bright yellow emissive glow at 2.5x size
 - Lives system (5 lives)
 - Progressive difficulty (wave-based speed increase)
+- Balanced speed: 0.8 initial, +0.1 per wave, 3s between missiles
 - Score: +10 per destroy, -20 per miss
 - Visual warnings when missiles get close
 - Auto-restart after game over
+- **Calibration Auto-Save**: Saves after first calibration, loads automatically next time
+- No repeated calibration needed during testing!
 
 **Standardization**:
 - All games now follow consistent calibration pattern
