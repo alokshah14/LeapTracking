@@ -1,9 +1,11 @@
 using UnityEngine;
 using Leap;
-using Leap.Unity;
+using System;
+using System.Reflection;
 
 /// <summary>
 /// Highlights a specific Leap Motion finger by making its capsules glow
+/// Uses reflection to avoid direct Leap.Unity assembly dependency
 /// </summary>
 public class LeapFingerHighlighter : MonoBehaviour
 {
@@ -11,7 +13,7 @@ public class LeapFingerHighlighter : MonoBehaviour
     [SerializeField] private Color highlightColor = Color.yellow;
     [SerializeField] private float highlightIntensity = 3.0f;
 
-    private LeapProvider leapProvider;
+    private Component leapProvider;
     private Material highlightMaterial;
     private Chirality currentHighlightHand;
     private int currentHighlightFinger = -1;
@@ -22,7 +24,12 @@ public class LeapFingerHighlighter : MonoBehaviour
 
     void Start()
     {
-        leapProvider = FindObjectOfType<LeapProvider>();
+        // Find LeapProvider using reflection
+        Type leapProviderType = GetTypeByName("Leap.Unity.LeapProvider");
+        if (leapProviderType != null)
+        {
+            leapProvider = FindObjectOfType(leapProviderType) as Component;
+        }
 
         // Create highlight material
         highlightMaterial = new Material(Shader.Find("Standard"));
@@ -42,28 +49,43 @@ public class LeapFingerHighlighter : MonoBehaviour
         currentHighlightHand = hand;
         currentHighlightFinger = fingerIndex;
 
-        // Find all hand renderers in scene
-        CapsuleHand[] capsuleHands = FindObjectsOfType<CapsuleHand>();
-
-        foreach (CapsuleHand capsuleHand in capsuleHands)
+        // Find all CapsuleHand components in scene using reflection
+        Type capsuleHandType = GetTypeByName("Leap.Unity.CapsuleHand");
+        if (capsuleHandType == null)
         {
-            if (capsuleHand.Handedness == hand)
-            {
-                // Get the finger we want to highlight
-                // CapsuleHand has fingers array indexed like: 0=Thumb, 1=Index, etc.
-                Transform fingerTransform = GetFingerTransform(capsuleHand, fingerIndex);
+            Debug.LogWarning("CapsuleHand type not found. Make sure Capsule Hands prefab is in scene.");
+            return;
+        }
 
-                if (fingerTransform != null)
+        Component[] capsuleHands = FindObjectsOfType(capsuleHandType) as Component[];
+
+        foreach (Component capsuleHand in capsuleHands)
+        {
+            // Get Handedness property using reflection
+            PropertyInfo handednessProperty = capsuleHandType.GetProperty("Handedness");
+            if (handednessProperty != null)
+            {
+                Chirality handedness = (Chirality)handednessProperty.GetValue(capsuleHand);
+
+                if (handedness == hand)
                 {
-                    // Highlight all renderers in this finger
-                    Renderer[] fingerRenderers = fingerTransform.GetComponentsInChildren<Renderer>();
-                    foreach (Renderer renderer in fingerRenderers)
+                    // Get the finger we want to highlight
+                    Transform fingerTransform = GetFingerTransform(capsuleHand, fingerIndex);
+
+                    if (fingerTransform != null)
                     {
-                        if (!originalMaterials.ContainsKey(renderer))
+                        // Highlight all renderers in this finger
+                        Renderer[] fingerRenderers = fingerTransform.GetComponentsInChildren<Renderer>();
+                        foreach (Renderer renderer in fingerRenderers)
                         {
-                            originalMaterials[renderer] = renderer.material;
+                            if (!originalMaterials.ContainsKey(renderer))
+                            {
+                                originalMaterials[renderer] = renderer.material;
+                            }
+                            renderer.material = highlightMaterial;
                         }
-                        renderer.material = highlightMaterial;
+
+                        Debug.Log($"Highlighted {fingerRenderers.Length} renderers for {hand} finger {fingerIndex}");
                     }
                 }
             }
@@ -91,7 +113,7 @@ public class LeapFingerHighlighter : MonoBehaviour
     /// <summary>
     /// Get the transform of a specific finger from CapsuleHand
     /// </summary>
-    private Transform GetFingerTransform(CapsuleHand capsuleHand, int fingerIndex)
+    private Transform GetFingerTransform(Component capsuleHand, int fingerIndex)
     {
         // CapsuleHand has child transforms for each finger
         // Look for transforms with finger names
@@ -122,7 +144,11 @@ public class LeapFingerHighlighter : MonoBehaviour
     {
         if (leapProvider == null) return Vector3.zero;
 
-        Frame frame = leapProvider.CurrentFrame;
+        // Get CurrentFrame using reflection
+        PropertyInfo frameProperty = leapProvider.GetType().GetProperty("CurrentFrame");
+        if (frameProperty == null) return Vector3.zero;
+
+        Frame frame = frameProperty.GetValue(leapProvider) as Frame;
         if (frame == null) return Vector3.zero;
 
         foreach (Hand leapHand in frame.Hands)
@@ -130,10 +156,18 @@ public class LeapFingerHighlighter : MonoBehaviour
             if (leapHand.IsLeft && hand == Chirality.Left ||
                 leapHand.IsRight && hand == Chirality.Right)
             {
-                Finger finger = GetFinger(leapHand, fingerIndex);
-                if (finger != null)
+                if (fingerIndex >= 0 && fingerIndex < leapHand.Fingers.Count)
                 {
-                    return finger.TipPosition.ToVector3();
+                    Finger finger = leapHand.Fingers[fingerIndex];
+                    if (finger != null)
+                    {
+                        // Convert Leap.Vector to Unity Vector3
+                        return new Vector3(
+                            finger.TipPosition.x,
+                            finger.TipPosition.y,
+                            finger.TipPosition.z
+                        );
+                    }
                 }
             }
         }
@@ -142,19 +176,20 @@ public class LeapFingerHighlighter : MonoBehaviour
     }
 
     /// <summary>
-    /// Get a specific finger from a Leap Hand
+    /// Helper method to find a type by name across all assemblies
     /// </summary>
-    private Finger GetFinger(Hand hand, int fingerIndex)
+    private Type GetTypeByName(string typeName)
     {
-        switch (fingerIndex)
+        Type type = Type.GetType(typeName);
+        if (type != null) return type;
+
+        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
         {
-            case 0: return hand.Fingers[0]; // Thumb
-            case 1: return hand.Fingers[1]; // Index
-            case 2: return hand.Fingers[2]; // Middle
-            case 3: return hand.Fingers[3]; // Ring
-            case 4: return hand.Fingers[4]; // Pinky
-            default: return null;
+            type = assembly.GetType(typeName);
+            if (type != null) return type;
         }
+
+        return null;
     }
 
     void OnDestroy()
