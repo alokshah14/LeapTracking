@@ -495,19 +495,28 @@ Assets/
 - ✅ Created MissileDefenseSetup.cs - auto-generates finger targets
 - ✅ Created MissileDefenseSceneBuilder.cs - auto-adds Leap/calibration components
 - ✅ Created MISSILE_DEFENSE_SETUP.md - comprehensive Unity setup guide
+- ✅ Created SHOOTING_SETUP.md - shooting mechanics guide
 - ✅ Documented standardized game pattern for reusability
 - ✅ Updated claude.md with new game architecture
 - ✅ Added visual finger highlighting (2.5x pulsing yellow glow)
-- ✅ Slowed down missiles for easier testing (0.8 speed, 3s intervals)
+- ✅ Slowed down missiles dramatically (0.3 speed, 4s intervals)
 - ✅ Implemented calibration save/load system (no recalibration needed!)
+- ✅ **Implemented Space Invaders shooting mechanics!**
+- ✅ **Leap Motion finger highlighting (actual 3D fingers glow!)**
+- ✅ **PlayerProjectile.cs - shoot projectiles from fingertips**
+- ✅ **LeapFingerHighlighter.cs - highlights real finger capsules**
 
 **Game Features**:
+- **Space Invaders Shooting**: Press finger to shoot projectile UP at falling missiles!
+- **Leap Motion Finger Glow**: Your ACTUAL 3D finger turns bright yellow
+- **Real Finger Positions**: Projectiles shoot from your actual fingertips
 - Missiles spawn randomly targeting specific fingers
-- **Visual Finger Highlighting**: Target finger pulses with bright yellow emissive glow at 2.5x size
+- Dual visual highlighting: Leap finger glows + target sphere pulses
 - Lives system (5 lives)
 - Progressive difficulty (wave-based speed increase)
-- Balanced speed: 0.8 initial, +0.1 per wave, 3s between missiles
+- Very playable speed: 0.3 initial, +0.05 per wave, 4s between missiles
 - Score: +10 per destroy, -20 per miss
+- Projectile-missile collision detection
 - Visual warnings when missiles get close
 - Auto-restart after game over
 - **Calibration Auto-Save**: Saves after first calibration, loads automatically next time
