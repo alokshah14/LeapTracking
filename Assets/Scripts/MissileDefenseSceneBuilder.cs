@@ -1,6 +1,7 @@
 using UnityEngine;
-using Leap.Unity;
 using UnityEngine.UI;
+using System;
+using System.Reflection;
 
 #if UNITY_EDITOR
 using UnityEditor;
@@ -9,6 +10,7 @@ using UnityEditor;
 /// <summary>
 /// Complete scene builder for Missile Defense game
 /// Adds all required components: Leap Provider, Calibration, UI, etc.
+/// Uses reflection to avoid direct Leap.Unity assembly dependency
 /// </summary>
 public class MissileDefenseSceneBuilder : MonoBehaviour
 {
@@ -46,8 +48,16 @@ public class MissileDefenseSceneBuilder : MonoBehaviour
 
     GameObject SetupLeapProvider()
     {
+        // Use reflection to find LeapServiceProvider type
+        Type leapServiceProviderType = GetTypeByName("Leap.Unity.LeapServiceProvider");
+        if (leapServiceProviderType == null)
+        {
+            Debug.LogError("❌ Could not find Leap.Unity.LeapServiceProvider type. Is Leap Motion SDK installed?");
+            return null;
+        }
+
         // Check if LeapServiceProvider already exists
-        LeapServiceProvider existingProvider = FindObjectOfType<LeapServiceProvider>();
+        Component existingProvider = FindObjectOfType(leapServiceProviderType) as Component;
         if (existingProvider != null)
         {
             Debug.Log("✓ LeapServiceProvider already exists");
@@ -56,10 +66,14 @@ public class MissileDefenseSceneBuilder : MonoBehaviour
 
         // Create new LeapServiceProvider
         GameObject providerObj = new GameObject("LeapServiceProvider");
-        LeapServiceProvider provider = providerObj.AddComponent<LeapServiceProvider>();
+        Component provider = providerObj.AddComponent(leapServiceProviderType);
 
-        // Configure provider
-        provider.interactionVolumeVisualization = false; // Disable visualization for cleaner scene
+        // Configure provider - disable visualization
+        PropertyInfo vizProp = leapServiceProviderType.GetProperty("interactionVolumeVisualization");
+        if (vizProp != null)
+        {
+            vizProp.SetValue(provider, false);
+        }
 
         Debug.Log("✓ Created LeapServiceProvider");
         return providerObj;
@@ -67,22 +81,30 @@ public class MissileDefenseSceneBuilder : MonoBehaviour
 
     GameObject SetupFingerIndividuationGame(GameObject leapProviderObj)
     {
+        // Find FingerIndividuationGame type
+        Type fingerGameType = GetTypeByName("FingerIndividuationGame");
+        if (fingerGameType == null)
+        {
+            Debug.LogError("❌ Could not find FingerIndividuationGame type.");
+            return null;
+        }
+
         // Check if already exists
-        FingerIndividuationGame existingGame = FindObjectOfType<FingerIndividuationGame>();
+        Component existingGame = FindObjectOfType(fingerGameType) as Component;
         if (existingGame != null)
         {
             Debug.Log("✓ FingerIndividuationGame already exists");
 
             // Make sure it has the leap provider assigned
-            if (existingGame.GetType().GetField("leapProvider",
-                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance) != null)
-            {
-                var field = existingGame.GetType().GetField("leapProvider",
-                    System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            FieldInfo field = existingGame.GetType().GetField("leapProvider",
+                BindingFlags.NonPublic | BindingFlags.Instance);
 
-                if (field.GetValue(existingGame) == null && leapProviderObj != null)
+            if (field != null && field.GetValue(existingGame) == null && leapProviderObj != null)
+            {
+                Type leapProviderType = GetTypeByName("Leap.Unity.LeapProvider");
+                if (leapProviderType != null)
                 {
-                    var leapProvider = leapProviderObj.GetComponent<LeapProvider>();
+                    Component leapProvider = leapProviderObj.GetComponent(leapProviderType);
                     field.SetValue(existingGame, leapProvider);
                     Debug.Log("  → Assigned LeapProvider to FingerIndividuationGame");
                 }
@@ -93,23 +115,27 @@ public class MissileDefenseSceneBuilder : MonoBehaviour
 
         // Create new
         GameObject gameObj = new GameObject("FingerIndividuationGame");
-        FingerIndividuationGame game = gameObj.AddComponent<FingerIndividuationGame>();
+        Component game = gameObj.AddComponent(fingerGameType);
 
         // Assign leap provider via reflection (since it's a SerializeField)
         if (leapProviderObj != null)
         {
-            var leapProvider = leapProviderObj.GetComponent<LeapProvider>();
-            var field = game.GetType().GetField("leapProvider",
-                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            Type leapProviderType = GetTypeByName("Leap.Unity.LeapProvider");
+            if (leapProviderType != null)
+            {
+                Component leapProvider = leapProviderObj.GetComponent(leapProviderType);
+                FieldInfo field = game.GetType().GetField("leapProvider",
+                    BindingFlags.NonPublic | BindingFlags.Instance);
 
-            if (field != null && leapProvider != null)
-            {
-                field.SetValue(game, leapProvider);
-                Debug.Log("✓ Created FingerIndividuationGame with LeapProvider");
-            }
-            else
-            {
-                Debug.LogWarning("⚠ Created FingerIndividuationGame but couldn't auto-assign LeapProvider - assign manually in Inspector");
+                if (field != null && leapProvider != null)
+                {
+                    field.SetValue(game, leapProvider);
+                    Debug.Log("✓ Created FingerIndividuationGame with LeapProvider");
+                }
+                else
+                {
+                    Debug.LogWarning("⚠ Created FingerIndividuationGame but couldn't auto-assign LeapProvider - assign manually in Inspector");
+                }
             }
         }
 
@@ -118,8 +144,16 @@ public class MissileDefenseSceneBuilder : MonoBehaviour
 
     void SetupUI()
     {
+        // Find GameUIManager type
+        Type gameUIManagerType = GetTypeByName("GameUIManager");
+        if (gameUIManagerType == null)
+        {
+            Debug.LogError("❌ Could not find GameUIManager type.");
+            return;
+        }
+
         // Check if GameUIManager exists
-        GameUIManager existingUI = FindObjectOfType<GameUIManager>();
+        Component existingUI = FindObjectOfType(gameUIManagerType) as Component;
         if (existingUI != null)
         {
             Debug.Log("✓ GameUIManager already exists");
@@ -154,15 +188,23 @@ public class MissileDefenseSceneBuilder : MonoBehaviour
         // Create GameUIManager
         GameObject uiManagerObj = new GameObject("GameUIManager");
         uiManagerObj.transform.SetParent(canvas.transform);
-        GameUIManager uiManager = uiManagerObj.AddComponent<GameUIManager>();
+        uiManagerObj.AddComponent(gameUIManagerType);
 
         Debug.Log("✓ Created GameUIManager");
     }
 
     void SetupHandDataLogger()
     {
+        // Find HandDataLogger type
+        Type handDataLoggerType = GetTypeByName("HandDataLogger");
+        if (handDataLoggerType == null)
+        {
+            Debug.LogError("❌ Could not find HandDataLogger type.");
+            return;
+        }
+
         // Check if already exists
-        HandDataLogger existingLogger = FindObjectOfType<HandDataLogger>();
+        Component existingLogger = FindObjectOfType(handDataLoggerType) as Component;
         if (existingLogger != null)
         {
             Debug.Log("✓ HandDataLogger already exists");
@@ -171,14 +213,22 @@ public class MissileDefenseSceneBuilder : MonoBehaviour
 
         // Create new
         GameObject loggerObj = new GameObject("HandDataLogger");
-        loggerObj.AddComponent<HandDataLogger>();
+        loggerObj.AddComponent(handDataLoggerType);
 
         Debug.Log("✓ Created HandDataLogger");
     }
 
     void CheckMissileDefenseManager()
     {
-        MissileDefenseManager manager = FindObjectOfType<MissileDefenseManager>();
+        // Find MissileDefenseManager type
+        Type managerType = GetTypeByName("MissileDefenseManager");
+        if (managerType == null)
+        {
+            Debug.LogWarning("⚠ Could not find MissileDefenseManager type.");
+            return;
+        }
+
+        Component manager = FindObjectOfType(managerType) as Component;
         if (manager == null)
         {
             Debug.LogWarning("⚠ MissileDefenseManager not found in scene!");
@@ -190,8 +240,8 @@ public class MissileDefenseSceneBuilder : MonoBehaviour
             Debug.Log("✓ MissileDefenseManager exists");
 
             // Check if it has required references
-            var fingerGameField = manager.GetType().GetField("fingerGame",
-                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            FieldInfo fingerGameField = manager.GetType().GetField("fingerGame",
+                BindingFlags.NonPublic | BindingFlags.Instance);
 
             if (fingerGameField != null && fingerGameField.GetValue(manager) == null)
             {
@@ -199,6 +249,23 @@ public class MissileDefenseSceneBuilder : MonoBehaviour
                 Debug.LogWarning("  → This will be auto-assigned when you press Play");
             }
         }
+    }
+
+    /// <summary>
+    /// Helper method to find a type by name across all assemblies
+    /// </summary>
+    private Type GetTypeByName(string typeName)
+    {
+        Type type = Type.GetType(typeName);
+        if (type != null) return type;
+
+        foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+        {
+            type = assembly.GetType(typeName);
+            if (type != null) return type;
+        }
+
+        return null;
     }
 
     void OnValidate()
