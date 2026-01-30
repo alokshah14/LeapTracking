@@ -156,23 +156,36 @@ public class LeapFingerHighlighter : MonoBehaviour
             if (leapHand.IsLeft && hand == Chirality.Left ||
                 leapHand.IsRight && hand == Chirality.Right)
             {
-                if (fingerIndex >= 0 && fingerIndex < leapHand.Fingers.Count)
+                Finger finger = GetFingerFromHand(leapHand, fingerIndex);
+                if (finger != null)
                 {
-                    Finger finger = leapHand.Fingers[fingerIndex];
-                    if (finger != null)
-                    {
-                        // Convert Leap.Vector to Unity Vector3
-                        return new Vector3(
-                            finger.TipPosition.x,
-                            finger.TipPosition.y,
-                            finger.TipPosition.z
-                        );
-                    }
+                    // Convert Leap.Vector to Unity Vector3
+                    return new Vector3(
+                        finger.TipPosition.x,
+                        finger.TipPosition.y,
+                        finger.TipPosition.z
+                    );
                 }
             }
         }
 
         return Vector3.zero;
+    }
+
+    /// <summary>
+    /// Get a specific finger from a Leap Hand using properties
+    /// </summary>
+    private Finger GetFingerFromHand(Hand hand, int fingerIndex)
+    {
+        switch (fingerIndex)
+        {
+            case 0: return hand.Thumb;
+            case 1: return hand.Index;
+            case 2: return hand.Middle;
+            case 3: return hand.Ring;
+            case 4: return hand.Pinky;
+            default: return null;
+        }
     }
 
     /// <summary>
